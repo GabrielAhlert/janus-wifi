@@ -1,0 +1,36 @@
+{{define "content"}}
+<div class="page-head">
+  <h1>Sites</h1>
+  <a class="button" href="/sites/new">Novo site</a>
+</div>
+
+<div class="stats">
+  <div class="stat"><span class="stat-value">{{.Data.Events24h}}</span><span class="stat-label">eventos de log nas últimas 24 h</span></div>
+  <div class="stat"><span class="stat-value">{{.Data.Stats.Unknown}}</span><span class="stat-label">mensagens de IPs não cadastrados</span></div>
+  <div class="stat {{if or .Data.Stats.Dropped .Data.Stats.Failed}}alert{{end}}"><span class="stat-value">{{.Data.Stats.Dropped}} / {{.Data.Stats.Failed}}</span><span class="stat-label">descartados / com falha de gravação</span></div>
+</div>
+
+{{if .Data.Sites}}
+<div class="card flush">
+<table class="table">
+  <thead><tr><th>Nome</th><th>Slug</th><th>Controlador</th><th class="num">Acessos (24 h)</th></tr></thead>
+  <tbody>
+  {{range .Data.Sites}}
+  <tr>
+    <td><a href="/sites/{{.ID}}">{{.Name}}</a></td>
+    <td class="mono">{{.Slug}}</td>
+    <td>{{if .Controller}}{{.Controller}}{{else}}<span class="badge warn">não configurado</span>{{end}}</td>
+    <td class="num">{{.Sessions}}</td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+{{else}}
+<div class="card empty">
+  <h2>Nenhum site ainda</h2>
+  <p class="muted">Um site é uma rede de visitantes com portal próprio: visual, campos e termos. Normalmente corresponde a um site do UniFi.</p>
+  <a class="button" href="/sites/new">Criar o primeiro site</a>
+</div>
+{{end}}
+{{end}}

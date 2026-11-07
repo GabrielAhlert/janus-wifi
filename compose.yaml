@@ -1,0 +1,44 @@
+# Uso:
+#   janus keygen > master_key   (ou: podman run --rm <imagem> keygen > master_key)
+#   cp .env.example .env        e defina POSTGRES_PASSWORD
+#   podman compose up -d
+#   podman compose exec janus /janus admin-create -email voce@empresa.com
+services:
+  db:
+    image: docker.io/library/postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: janus
+      POSTGRES_USER: janus
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U janus"]
+      interval: 5s
+      retries: 10
+
+  janus:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      JANUS_DATABASE_URL: postgres://janus:${POSTGRES_PASSWORD}@db:5432/janus
+      JANUS_MASTER_KEY_FILE: /run/secrets/master_key
+      JANUS_ADMIN_ADDR: ":8081"
+    secrets:
+      - master_key
+    ports:
+      - "80:8080"              # portal: o UniFi redireciona para a porta 80
+      - "127.0.0.1:8081:8081"  # painel: exponha só na rede de gestão (ou atrás de um proxy HTTPS)
+      - "5514:5514/udp"        # syslog
+      - "5514:5514/tcp"
+
+volumes:
+  pgdata:
+
+secrets:
+  master_key:
+    file: ./master_key

@@ -1,0 +1,70 @@
+{{define "content"}}
+<div class="split">
+<form method="post" enctype="multipart/form-data" class="stack">
+  {{with .Data}}
+  <section class="card stack">
+    <h2>Marca</h2>
+    <div class="grid">
+      <div class="upload">
+        <span class="label">Logo</span>
+        {{if .LogoAsset}}<img class="thumb" src="/assets/{{.LogoAsset}}" alt="Logo atual">{{end}}
+        <input type="file" name="logo" accept="image/png,image/jpeg,image/webp,image/gif">
+        {{if .LogoAsset}}<label class="check"><input type="checkbox" name="remove_logo" value="1"><span>Remover logo</span></label>{{end}}
+      </div>
+      <div class="upload">
+        <span class="label">Imagem de fundo</span>
+        {{if .BackgroundAsset}}<img class="thumb" src="/assets/{{.BackgroundAsset}}" alt="Fundo atual">{{end}}
+        <input type="file" name="background" accept="image/png,image/jpeg,image/webp,image/gif">
+        {{if .BackgroundAsset}}<label class="check"><input type="checkbox" name="remove_background" value="1"><span>Remover fundo</span></label>{{end}}
+      </div>
+    </div>
+    <small class="muted">PNG, JPEG, GIF ou WebP, até 3 MB.</small>
+  </section>
+
+  <section class="card stack">
+    <h2>Cores</h2>
+    <div class="grid colors">
+      <label>Principal<input type="color" name="primary_color" value="{{.PrimaryColor}}" data-css-var="--primary"></label>
+      <label>Fundo<input type="color" name="background_color" value="{{.BackgroundColor}}" data-css-var="--bg"></label>
+      <label>Cartão<input type="color" name="card_color" value="{{.CardColor}}" data-css-var="--card"></label>
+      <label>Texto<input type="color" name="text_color" value="{{.TextColor}}" data-css-var="--text"></label>
+    </div>
+  </section>
+
+  <section class="card stack">
+    <h2>Textos</h2>
+    <label>Título<input name="title" value="{{.Title}}" maxlength="500" data-text="title"></label>
+    <label>Boas-vindas<textarea name="welcome" rows="2" maxlength="500" data-text="welcome">{{.Welcome}}</textarea></label>
+    <div class="grid">
+      <label>Botão<input name="button_text" value="{{.ButtonText}}" maxlength="500" required data-text="button"></label>
+      <label>Aceite dos termos<input name="terms_label" value="{{.TermsLabel}}" maxlength="500" data-text="terms_label"></label>
+      <label>Título após conectar<input name="success_title" value="{{.SuccessTitle}}" maxlength="500" data-text="success_title"></label>
+      <label>Texto após conectar<input name="success_text" value="{{.SuccessText}}" maxlength="500" data-text="success_text"></label>
+    </div>
+    <label>Rodapé<input name="footer" value="{{.Footer}}" maxlength="500" data-text="footer"></label>
+    <label>Redirecionar após conectar
+      <input name="redirect_url" type="url" value="{{.RedirectURL}}" placeholder="https://www.suaempresa.com.br">
+      <small>Em branco, o visitante volta para a página que tentou abrir.</small>
+    </label>
+  </section>
+
+  <section class="card stack">
+    <h2>CSS personalizado</h2>
+    <textarea name="custom_css" rows="6" class="mono" spellcheck="false" placeholder=".card { border-radius: 0; }">{{.CustomCSS}}</textarea>
+    <small class="muted">Aplicado depois do tema. Variáveis disponíveis: <code>--primary</code>, <code>--bg</code>, <code>--card</code>, <code>--text</code>.</small>
+  </section>
+  {{end}}
+
+  <div class="actions"><button type="submit">Salvar aparência</button></div>
+</form>
+
+<aside class="preview">
+  <div class="preview-head">
+    <strong>Pré-visualização</strong>
+    <span><a href="/sites/{{.Site.ID}}/preview" target="preview">Formulário</a> · <a href="/sites/{{.Site.ID}}/preview?page=success" target="preview">Conectado</a></span>
+  </div>
+  <iframe name="preview" src="/sites/{{.Site.ID}}/preview" data-preview title="Pré-visualização do portal"></iframe>
+  <p class="muted small">Cores e textos mudam ao vivo. Imagens aparecem depois de salvar.</p>
+</aside>
+</div>
+{{end}}

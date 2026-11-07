@@ -1,0 +1,27 @@
+{{define "content"}}
+<div class="split">
+  <form method="post" class="card stack">
+    <h2>Publicar nova versão</h2>
+    <p class="muted small">Versões publicadas não são alteradas. Cada acesso registra a versão que o visitante aceitou.</p>
+    <label>Título<input name="title" value="{{.Data.Current.Title}}" required maxlength="200"></label>
+    <label>Texto
+      <textarea name="body" rows="20" required>{{.Data.Current.Body}}</textarea>
+      <small>Separe os parágrafos com uma linha em branco. Revise o texto com o jurídico antes de publicar.</small>
+    </label>
+    <div class="actions"><button type="submit">Publicar versão {{.Data.Next}}</button></div>
+  </form>
+
+  <aside class="card stack">
+    <h2>Histórico</h2>
+    <ul class="history">
+      {{range .Data.History}}
+      <li>
+        <strong>Versão {{.Version}}</strong>
+        <span class="muted">{{.CreatedAt.Format "02/01/2006 15:04"}}</span>
+        {{if eq .Version (index $.Data.History 0).Version}}<span class="badge ok">vigente</span>{{end}}
+      </li>
+      {{end}}
+    </ul>
+  </aside>
+</div>
+{{end}}

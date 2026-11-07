@@ -1,0 +1,67 @@
+{{define "content"}}
+<div class="callout">
+  <p>Defina o que o visitante preenche e como cada dado é guardado. Mudanças valem para novos cadastros.</p>
+  <ul>
+    <li><strong>Cifrado</strong>: ninguém lê sem a chave mestra. Use para dados pessoais.</li>
+    <li><strong>Cifrado + pesquisável</strong>: também gera um índice cego para buscas exatas (ex.: achar todos os acessos de um CPF numa requisição judicial).</li>
+    <li><strong>Texto puro</strong>: só para dados não pessoais, como opt-ins.</li>
+  </ul>
+</div>
+
+<div class="stack">
+{{range .Data.Fields}}
+<details class="card field-card">
+  <summary>
+    <span class="field-title">{{.Field.Label}} <code>{{.Field.Key}}</code></span>
+    <span class="badges">
+      <span class="badge">{{.Field.Type.Label}}</span>
+      <span class="badge {{if eq .Field.Protection "plain"}}warn{{else}}ok{{end}}">{{.Field.Protection.Label}}</span>
+      {{if .Field.Required}}<span class="badge">obrigatório</span>{{end}}
+      {{if not .Field.Enabled}}<span class="badge muted">desativado</span>{{end}}
+    </span>
+  </summary>
+  <form method="post" action="/sites/{{$.Site.ID}}/fields/{{.Field.ID}}" class="stack">
+    {{template "field-form" .}}
+    <div class="actions"><button type="submit">Salvar campo</button></div>
+  </form>
+  <form method="post" action="/sites/{{$.Site.ID}}/fields/{{.Field.ID}}/delete" class="delete-form"
+    data-confirm="Excluir o campo “{{.Field.Label}}”? Os dados já coletados continuam guardados.">
+    <button class="link danger">Excluir campo</button>
+  </form>
+</details>
+{{end}}
+</div>
+
+<section class="card stack">
+  <h2>Novo campo</h2>
+  <form method="post" action="/sites/{{.Site.ID}}/fields" class="stack">
+    <label>Chave
+      <input name="key" required pattern="[a-z][a-z0-9_]*" maxlength="32" class="mono" placeholder="empresa">
+      <small>Identificador interno. Não pode ser alterado depois.</small>
+    </label>
+    {{template "field-form" .Data.New}}
+    <div class="actions"><button type="submit">Adicionar campo</button></div>
+  </form>
+</section>
+{{end}}
+
+{{define "field-form"}}
+<div class="grid">
+  <label>Rótulo<input name="label" value="{{.Field.Label}}" required maxlength="120"></label>
+  <label>Texto de exemplo<input name="placeholder" value="{{.Field.Placeholder}}" maxlength="120"></label>
+  <label>Tipo
+    <select name="type">{{range .Types}}<option value="{{.}}" {{if eq . $.Field.Type}}selected{{end}}>{{.Label}}</option>{{end}}</select>
+  </label>
+  <label>Armazenamento
+    <select name="protection">{{range .Protections}}<option value="{{.}}" {{if eq . $.Field.Protection}}selected{{end}}>{{.Label}}</option>{{end}}</select>
+  </label>
+  <label>Ordem<input type="number" name="position" value="{{.Field.Position}}"></label>
+</div>
+<label>Finalidade (LGPD)
+  <input name="purpose" value="{{.Field.Purpose}}" maxlength="300" placeholder="Para que este dado é coletado">
+</label>
+<div class="row">
+  <label class="check"><input type="checkbox" name="required" value="1" {{if .Field.Required}}checked{{end}}><span>Obrigatório</span></label>
+  <label class="check"><input type="checkbox" name="enabled" value="1" {{if .Field.Enabled}}checked{{end}}><span>Ativo no portal</span></label>
+</div>
+{{end}}

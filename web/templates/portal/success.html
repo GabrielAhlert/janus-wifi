@@ -1,0 +1,9 @@
+{{define "content"}}
+<div class="ok-icon" aria-hidden="true">✓</div>
+<h1 data-text="success_title">{{.Theme.SuccessTitle}}</h1>
+<p class="lead" data-text="success_text">{{.Theme.SuccessText}}</p>
+{{if .RedirectURL}}
+<a class="button" href="{{.RedirectURL}}">Continuar</a>
+<p class="muted">Você será redirecionado em instantes.</p>
+{{end}}
+{{end}}

@@ -1,0 +1,44 @@
+{{define "content"}}
+<div class="page-head"><h1>Fontes de log</h1></div>
+<p class="muted">Equipamentos que enviam syslog ao Janus. Mensagens de IPs não cadastrados aqui são descartadas.</p>
+
+{{if .Data.Sources}}
+<div class="card flush">
+<table class="table">
+  <thead><tr><th>Nome</th><th>IP de origem</th><th>Parser</th><th></th></tr></thead>
+  <tbody>
+  {{range .Data.Sources}}
+  <tr>
+    <td>{{.Name}}</td>
+    <td class="mono">{{.SenderIP}}</td>
+    <td>{{.Parser}}</td>
+    <td class="num">
+      <form method="post" action="/log-sources/{{.ID}}/delete" data-confirm="Remover a fonte {{.Name}}? Os eventos já gravados são mantidos.">
+        <button class="link danger">Remover</button>
+      </form>
+    </td>
+  </tr>
+  {{end}}
+  </tbody>
+</table>
+</div>
+{{end}}
+
+<section class="card stack">
+  <h2>Nova fonte</h2>
+  <form method="post" action="/log-sources" class="stack">
+    <div class="grid">
+      <label>Nome<input name="name" required maxlength="120" placeholder="UCG matriz"></label>
+      <label>IP de origem<input name="sender_ip" required class="mono" placeholder="192.168.1.1"></label>
+      <label>Parser
+        <select name="parser">{{range .Data.Parsers}}<option value="{{.Name}}">{{.Label}}</option>{{end}}</select>
+      </label>
+    </div>
+    <div class="actions"><button type="submit">Adicionar fonte</button></div>
+  </form>
+</section>
+
+{{range .Data.Parsers}}{{with .Help}}
+<div class="callout"><strong>Como configurar:</strong> {{.}}</div>
+{{end}}{{end}}
+{{end}}

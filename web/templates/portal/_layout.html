@@ -1,0 +1,28 @@
+{{define "layout"}}<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+{{if .RedirectURL}}<meta http-equiv="refresh" content="5;url={{.RedirectURL}}">{{end}}
+<title>{{.Theme.Title}}</title>
+<link rel="stylesheet" href="/static/portal.css">
+<style>
+:root {
+  --primary: {{.Theme.PrimaryColor}};
+  --bg: {{.Theme.BackgroundColor}};
+  --card: {{.Theme.CardColor}};
+  --text: {{.Theme.TextColor}};
+}
+{{if .Theme.BackgroundAsset}}body { background-image: url("/assets/{{.Theme.BackgroundAsset}}"); }{{end}}
+{{.CustomCSS}}
+</style>
+</head>
+<body>
+{{if .Preview}}<div class="preview-banner">Pré-visualização: nada é enviado</div>{{end}}
+<main class="card">
+  {{if .Theme.LogoAsset}}<img class="logo" src="/assets/{{.Theme.LogoAsset}}" alt="">{{end}}
+  {{template "content" .}}
+</main>
+<footer data-text="footer">{{.Theme.Footer}}</footer>
+</body>
+</html>{{end}}

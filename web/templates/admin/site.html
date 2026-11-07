@@ -1,0 +1,54 @@
+{{define "content"}}
+{{if .Data.IsNew}}<div class="page-head"><h1>Novo site</h1></div>{{end}}
+<form method="post" action="{{if .Data.IsNew}}/sites{{else}}/sites/{{.Data.Site.ID}}{{end}}" class="stack">
+  <section class="card stack">
+    <h2>Identificação</h2>
+    <div class="grid">
+      <label>Nome
+        <input name="name" value="{{.Data.Site.Name}}" required maxlength="120">
+      </label>
+      <label>Slug
+        <input name="slug" value="{{.Data.Site.Slug}}" required pattern="[a-z0-9][a-z0-9_\-]*" class="mono" maxlength="63">
+        <small>O UniFi redireciona para <code>/guest/s/&lt;site&gt;/</code>. Use o nome curto do site no controlador, como <code>default</code>.</small>
+      </label>
+      <label>Duração do acesso (minutos)
+        <input type="number" name="session_minutes" min="1" max="43200" value="{{.Data.Site.SessionMinutes}}" required>
+      </label>
+    </div>
+  </section>
+
+  <section class="card stack">
+    <h2>Controlador Wi-Fi</h2>
+    <label>Plugin
+      <select name="controller" data-plugin-select>
+        <option value="">Nenhum</option>
+        {{range .Data.Drivers}}<option value="{{.Name}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>{{end}}
+      </select>
+    </label>
+    {{range $d := .Data.Drivers}}
+    <fieldset class="plugin-config" data-plugin="{{$d.Name}}" {{if not $d.Selected}}hidden{{end}}>
+      <legend>{{$d.Label}}</legend>
+      <div class="grid">
+      {{range $d.Fields}}
+        {{if eq .Type "bool"}}
+        <label class="check">
+          <input type="checkbox" name="cfg.{{$d.Name}}.{{.Key}}" value="true" {{if eq .Value "true"}}checked{{end}}>
+          <span>{{.Label}}{{with .Help}}<small>{{.}}</small>{{end}}</span>
+        </label>
+        {{else}}
+        <label>{{.Label}}{{if .Required}} <abbr title="obrigatório">*</abbr>{{end}}
+          <input name="cfg.{{$d.Name}}.{{.Key}}" type="{{if .Secret}}password{{else if eq .Type "number"}}number{{else}}text{{end}}"
+            value="{{.Value}}" autocomplete="off" {{if .SecretSet}}placeholder="•••••••• (mantida)"{{end}}>
+          {{with .Help}}<small>{{.}}</small>{{end}}
+        </label>
+        {{end}}
+      {{end}}
+      </div>
+    </fieldset>
+    {{end}}
+    <p class="muted small">As credenciais do controlador são guardadas cifradas. Deixe a senha em branco para manter a atual.</p>
+  </section>
+
+  <div class="actions"><button type="submit">{{if .Data.IsNew}}Criar site{{else}}Salvar{{end}}</button></div>
+</form>
+{{end}}

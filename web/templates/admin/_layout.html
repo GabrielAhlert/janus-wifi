@@ -1,0 +1,44 @@
+{{define "layout"}}<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}} · Janus</title>
+<link rel="stylesheet" href="/static/admin.css">
+<script src="/static/admin.js" defer></script>
+</head>
+<body>
+{{if .Admin}}
+<header class="topbar">
+  <a class="brand" href="/">Janus <span>Wi-Fi</span></a>
+  <nav class="mainnav">
+    <a href="/">Sites</a>
+    <a href="/log-sources">Fontes de log</a>
+    <a href="/settings">Configurações</a>
+  </nav>
+  <form method="post" action="/logout" class="who">
+    <span>{{.Admin.Email}}</span>
+    <button class="link">Sair</button>
+  </form>
+</header>
+{{end}}
+<main class="container">
+  {{with .Site}}
+  <div class="site-head">
+    <p class="eyebrow"><a href="/">Sites</a> /</p>
+    <h1>{{.Name}}</h1>
+    <p class="muted mono">/guest/s/{{.Slug}}/</p>
+  </div>
+  <nav class="tabs">
+    <a href="/sites/{{.ID}}" {{if eq $.Tab "general"}}class="active"{{end}}>Geral</a>
+    <a href="/sites/{{.ID}}/appearance" {{if eq $.Tab "appearance"}}class="active"{{end}}>Aparência</a>
+    <a href="/sites/{{.ID}}/fields" {{if eq $.Tab "fields"}}class="active"{{end}}>Campos</a>
+    <a href="/sites/{{.ID}}/terms" {{if eq $.Tab "terms"}}class="active"{{end}}>Termos de uso</a>
+  </nav>
+  {{end}}
+  {{if .Saved}}<div class="flash ok" role="status">Alterações salvas.</div>{{end}}
+  {{with .Error}}<div class="flash err" role="alert">{{.}}</div>{{end}}
+  {{template "content" .}}
+</main>
+</body>
+</html>{{end}}

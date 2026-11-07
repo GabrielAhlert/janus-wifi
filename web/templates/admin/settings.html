@@ -1,0 +1,11 @@
+{{define "content"}}
+<div class="page-head"><h1>Configurações</h1></div>
+<form method="post" class="card stack narrow">
+  <h2>Retenção de dados</h2>
+  <label>Guardar cadastros, acessos e logs por (meses)
+    <input type="number" name="retention_months" min="1" max="120" value="{{.Data.RetentionMonths}}" required>
+  </label>
+  <p class="muted small">O Marco Civil da Internet (art. 13) exige guardar os registros de conexão por no mínimo 12 meses. Ao fim do prazo, os dados são apagados e a chave de cada mês vencido é destruída, o que torna ilegíveis também as cópias em backup.</p>
+  <div class="actions"><button type="submit">Salvar</button></div>
+</form>
+{{end}}

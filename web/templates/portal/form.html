@@ -1,0 +1,38 @@
+{{define "content"}}
+<h1 data-text="title">{{.Theme.Title}}</h1>
+<p class="lead" data-text="welcome">{{.Theme.Welcome}}</p>
+
+{{if .Errors}}
+<div class="alert" role="alert">{{range .Errors}}<p>{{.}}</p>{{end}}</div>
+{{end}}
+
+<form method="post" action="{{.Action}}">
+  <input type="hidden" name="ticket" value="{{.Ticket}}">
+
+  {{range .Fields}}
+    {{if eq .Type "checkbox"}}
+    <label class="check">
+      <input type="checkbox" name="f_{{.Key}}" value="1" {{if index $.Values .Key}}checked{{end}} {{if .Required}}required{{end}}>
+      <span>{{.Label}}</span>
+    </label>
+    {{else}}
+    <label class="field">
+      <span>{{.Label}}{{if .Required}} <abbr title="obrigatório">*</abbr>{{end}}</span>
+      <input type="{{.Type.InputType}}" name="f_{{.Key}}" value="{{index $.Values .Key}}" placeholder="{{.Placeholder}}"
+        {{if eq .Type "cpf" "phone"}}inputmode="numeric"{{end}} {{if .Required}}required{{end}} maxlength="200">
+    </label>
+    {{end}}
+  {{end}}
+
+  <details class="terms">
+    <summary>{{.Terms.Title}}</summary>
+    <div class="terms-body">{{range .Terms.Paragraphs}}<p>{{.}}</p>{{end}}</div>
+  </details>
+  <label class="check">
+    <input type="checkbox" name="accept" value="1" required>
+    <span data-text="terms_label">{{.Theme.TermsLabel}}</span>
+  </label>
+
+  <button type="submit" data-text="button" {{if .Preview}}disabled{{end}}>{{.Theme.ButtonText}}</button>
+</form>
+{{end}}
