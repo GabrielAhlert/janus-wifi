@@ -58,17 +58,18 @@ func open(t *testing.T) store.Store {
 
 func TestContract(t *testing.T) { storetest.Run(t, open) }
 
-func TestDescribeHidesPassword(t *testing.T) {
-	if os.Getenv("JANUS_TEST_POSTGRES_URL") == "" {
-		t.Skip("defina JANUS_TEST_POSTGRES_URL para testar o driver Postgres")
-	}
-	db, err := Open(context.Background(), os.Getenv("JANUS_TEST_POSTGRES_URL"))
+func TestDescribeHidesCredentials(t *testing.T) {
+	cfg, err := pgx.ParseConfig("postgres://usuario-x:senha-secreta-123@db.lan:5433/janus")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
-	u, _ := url.Parse(os.Getenv("JANUS_TEST_POSTGRES_URL"))
-	if pw, ok := u.User.Password(); ok && strings.Contains(db.Describe(), pw) {
-		t.Fatalf("Describe expõe a senha: %q", db.Describe())
+	got := describe(cfg)
+	if want := "PostgreSQL em db.lan:5433/janus"; got != want {
+		t.Fatalf("describe = %q, quer %q", got, want)
+	}
+	for _, secret := range []string{"senha-secreta-123", "usuario-x"} {
+		if strings.Contains(got, secret) {
+			t.Fatalf("describe expõe %q: %q", secret, got)
+		}
 	}
 }

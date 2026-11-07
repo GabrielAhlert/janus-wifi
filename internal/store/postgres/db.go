@@ -33,8 +33,12 @@ func Open(ctx context.Context, url string) (*DB, error) {
 		pool.Close()
 		return nil, fmt.Errorf("conectar ao banco: %w", err)
 	}
-	c := cfg.ConnConfig
-	return &DB{pool: pool, desc: fmt.Sprintf("PostgreSQL em %s:%d/%s", c.Host, c.Port, c.Database)}, nil
+	return &DB{pool: pool, desc: describe(cfg.ConnConfig)}, nil
+}
+
+// describe identifica o banco para o painel e os logs, sem usuário nem senha.
+func describe(c *pgx.ConnConfig) string {
+	return fmt.Sprintf("PostgreSQL em %s:%d/%s", c.Host, c.Port, c.Database)
 }
 
 func (db *DB) Close() { db.pool.Close() }
