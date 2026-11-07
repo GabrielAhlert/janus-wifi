@@ -13,20 +13,20 @@ import (
 	"janus/internal/core"
 	"janus/internal/plugin/wifi"
 	"janus/internal/sites"
-	"janus/internal/store/postgres"
+	"janus/internal/store"
 	"janus/internal/vault"
 )
 
 var sessionAAD = []byte("janus/session")
 
 type Service struct {
-	db    *postgres.DB
+	db    store.Store
 	vault *vault.Vault
 	sites *sites.Service
 	log   *slog.Logger
 }
 
-func New(db *postgres.DB, v *vault.Vault, s *sites.Service, log *slog.Logger) *Service {
+func New(db store.Store, v *vault.Vault, s *sites.Service, log *slog.Logger) *Service {
 	return &Service{db: db, vault: v, sites: s, log: log}
 }
 

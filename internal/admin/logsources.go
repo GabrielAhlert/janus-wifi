@@ -48,6 +48,7 @@ func (h *Handler) createLogSource(w http.ResponseWriter, r *http.Request, a core
 	} else if err != nil {
 		return err
 	}
+	h.ReloadLogSources()
 	h.audit(r, a, "log_source.create", map[string]any{"id": s.ID, "ip": s.SenderIP.String(), "parser": s.Parser})
 	redirectSaved(w, r, "/log-sources")
 	return nil
@@ -61,6 +62,7 @@ func (h *Handler) deleteLogSource(w http.ResponseWriter, r *http.Request, a core
 	if err := h.DB.DeleteLogSource(r.Context(), id); err != nil {
 		return err
 	}
+	h.ReloadLogSources()
 	h.audit(r, a, "log_source.delete", map[string]any{"id": id})
 	redirectSaved(w, r, "/log-sources")
 	return nil

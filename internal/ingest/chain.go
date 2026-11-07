@@ -49,7 +49,7 @@ type ChainError struct {
 
 func (e *ChainError) Error() string { return fmt.Sprintf("evento %d: %s", e.ID, e.Reason) }
 
-// Scanner percorre os eventos em ordem de id (ver postgres.DB.ScanLogEvents).
+// Scanner percorre os eventos em ordem de id (ver store.Store.ScanLogEvents).
 type Scanner func(ctx context.Context, fn func(core.LogRecord) error) error
 
 // Verify confere a cadeia inteira. O primeiro evento restante serve de

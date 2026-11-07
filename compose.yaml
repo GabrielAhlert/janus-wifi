@@ -1,3 +1,6 @@
+# Exemplo com Postgres. Sem o serviço "db" e sem JANUS_DATABASE_URL, o Janus
+# usa SQLite em /data (um container só; veja deploy/unraid para esse formato).
+#
 # Uso:
 #   janus keygen > master_key   (ou: podman run --rm <imagem> keygen > master_key)
 #   cp .env.example .env        e defina POSTGRES_PASSWORD

@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<!--
+  Template do Janus Wi-Fi para o Unraid (aba Docker).
+  Instalação: copie para /boot/config/plugins/dockerMan/templates-user/my-janus-wifi.xml
+  e use Docker > Add Container > Template: janus-wifi.
+-->
+<Container version="2">
+  <Name>janus-wifi</Name>
+  <Repository>ghcr.io/gabrielahlert/janus-wifi:main</Repository>
+  <Registry>https://github.com/GabrielAhlert/janus-wifi/pkgs/container/janus-wifi</Registry>
+  <Network>br0</Network>
+  <MyIP></MyIP>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/GabrielAhlert/janus-wifi</Support>
+  <Project>https://github.com/GabrielAhlert/janus-wifi</Project>
+  <Overview>Portal cativo corporativo para Wi-Fi de visitantes (UniFi), com dados pessoais cifrados e guarda de logs de conexão (Marco Civil). Precisa de um IP próprio na br0: o UniFi exige o portal na porta 80, que o Unraid já usa. Na primeira inicialização a chave mestra é gerada em /secrets: faça backup dela fora do servidor.</Overview>
+  <Category>Network:Other Security:</Category>
+  <WebUI>http://[IP]:8081/</WebUI>
+  <ExtraParams>--user 99:100 --sysctl net.ipv4.ip_unprivileged_port_start=0</ExtraParams>
+  <PostArgs/>
+  <Config Name="Dados" Target="/data" Default="/mnt/user/appdata/janus" Mode="rw" Description="Banco SQLite (janus.db). Não é usado se o banco for um Postgres externo." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/janus</Config>
+  <Config Name="Chave mestra" Target="/secrets" Default="/mnt/user/appdata/janus-secrets" Mode="rw" Description="Guarda o master_key. Pasta separada para poder ficar fora do backup de appdata; guarde uma cópia offline, pois sem ela os dados ficam ilegíveis." Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/janus-secrets</Config>
+  <Config Name="Banco de dados" Target="JANUS_DATABASE_URL" Default="sqlite:///data/janus.db" Mode="" Description="sqlite:///data/janus.db (padrão, container único) ou um Postgres externo: postgres://usuario:senha@host:5432/janus" Type="Variable" Display="always" Required="true" Mask="false">sqlite:///data/janus.db</Config>
+  <Config Name="Redes com acesso ao painel" Target="JANUS_ADMIN_ALLOW" Default="192.168.1.0/24" Mode="" Description="Redes (CIDR, separadas por vírgula) que podem abrir o painel na porta 8081. Não inclua a rede de visitantes." Type="Variable" Display="always" Required="false" Mask="false">192.168.1.0/24</Config>
+  <Config Name="Porta do portal" Target="JANUS_PORTAL_ADDR" Default=":80" Mode="" Description="O UniFi redireciona os visitantes para a porta 80." Type="Variable" Display="advanced" Required="true" Mask="false">:80</Config>
+  <Config Name="Porta do painel" Target="JANUS_ADMIN_ADDR" Default=":8081" Mode="" Description="Painel administrativo." Type="Variable" Display="advanced" Required="true" Mask="false">:8081</Config>
+  <Config Name="Porta do syslog" Target="JANUS_SYSLOG_ADDR" Default=":514" Mode="" Description="Recebe o syslog do UCG (UDP e TCP)." Type="Variable" Display="advanced" Required="true" Mask="false">:514</Config>
+  <Config Name="Arquivo da chave mestra" Target="JANUS_MASTER_KEY_FILE" Default="/secrets/master_key" Mode="" Description="Caminho dentro do container." Type="Variable" Display="advanced" Required="true" Mask="false">/secrets/master_key</Config>
+  <Config Name="Cookies sem HTTPS" Target="JANUS_INSECURE_COOKIES" Default="1" Mode="" Description="1 permite o login no painel por HTTP na LAN. Use 0 se houver um proxy HTTPS na frente." Type="Variable" Display="advanced" Required="false" Mask="false">1</Config>
+</Container>

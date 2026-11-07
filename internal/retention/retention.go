@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"time"
 
-	"janus/internal/store/postgres"
+	"janus/internal/store"
 	"janus/internal/vault"
 )
 
@@ -17,12 +17,12 @@ const (
 )
 
 type Janitor struct {
-	db    *postgres.DB
+	db    store.Store
 	vault *vault.Vault
 	log   *slog.Logger
 }
 
-func New(db *postgres.DB, v *vault.Vault, log *slog.Logger) *Janitor {
+func New(db store.Store, v *vault.Vault, log *slog.Logger) *Janitor {
 	return &Janitor{db: db, vault: v, log: log}
 }
 

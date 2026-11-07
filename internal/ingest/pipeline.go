@@ -54,10 +54,11 @@ type Stats struct {
 }
 
 type Pipeline struct {
-	store Store
-	vault *vault.Vault
-	log   *slog.Logger
-	queue chan item
+	store  Store
+	vault  *vault.Vault
+	log    *slog.Logger
+	queue  chan item
+	reload chan struct{}
 
 	mu     sync.RWMutex
 	routes map[netip.Addr]route
@@ -66,7 +67,23 @@ type Pipeline struct {
 }
 
 func New(store Store, v *vault.Vault, log *slog.Logger) *Pipeline {
-	return &Pipeline{store: store, vault: v, log: log, queue: make(chan item, queueSize), routes: map[netip.Addr]route{}}
+	return &Pipeline{
+		store:  store,
+		vault:  v,
+		log:    log,
+		queue:  make(chan item, queueSize),
+		reload: make(chan struct{}, 1),
+		routes: map[netip.Addr]route{},
+	}
+}
+
+// Reload pede que as fontes de log sejam relidas já, sem esperar o ciclo
+// periódico. O painel chama ao cadastrar ou remover uma fonte.
+func (p *Pipeline) Reload() {
+	select {
+	case p.reload <- struct{}{}:
+	default: // já há um pedido pendente
+	}
 }
 
 func (p *Pipeline) Stats() Stats {
@@ -147,6 +164,10 @@ func (p *Pipeline) Run(ctx context.Context) error {
 				batch = batch[:0]
 			}
 		case <-refresh.C:
+			if err := p.refresh(ctx); err != nil {
+				p.log.Warn("não foi possível recarregar as fontes de log", "err", err)
+			}
+		case <-p.reload:
 			if err := p.refresh(ctx); err != nil {
 				p.log.Warn("não foi possível recarregar as fontes de log", "err", err)
 			}

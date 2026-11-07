@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -22,7 +23,9 @@ import (
 	"janus/internal/portal"
 	"janus/internal/retention"
 	"janus/internal/sites"
+	"janus/internal/store"
 	"janus/internal/store/postgres"
+	"janus/internal/store/sqlite"
 	"janus/internal/syslog"
 	"janus/internal/vault"
 	"janus/web"
@@ -36,8 +39,13 @@ func Serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 		return err
 	}
 	defer db.Close()
+	log.Info("banco de dados", "driver", db.Describe())
 
-	keys, err := vault.DeriveKeys(cfg.MasterKey)
+	master, err := ensureMasterKey(ctx, cfg, db, log)
+	if err != nil {
+		return err
+	}
+	keys, err := vault.DeriveKeys(master)
 	if err != nil {
 		return err
 	}
@@ -58,7 +66,8 @@ func Serve(ctx context.Context, cfg config.Config, log *slog.Logger) error {
 	pipeline := ingest.New(db, v, log)
 	adminH := admin.New(admin.Deps{
 		DB: db, Sites: siteSvc, Portal: portalH, Templates: tmpl.Admin,
-		Stats: pipeline.Stats, Log: log, SecureCookies: cfg.SecureCookies,
+		Stats: pipeline.Stats, ReloadLogSources: pipeline.Reload,
+		Log: log, SecureCookies: cfg.SecureCookies, AllowedNets: cfg.AdminAllow,
 	})
 	syslogSrv := &syslog.Server{Addr: cfg.SyslogAddr, Handler: pipeline.Handle, Log: log}
 	janitor := retention.New(db, v, log)
@@ -111,7 +120,7 @@ func CreateAdmin(ctx context.Context, cfg config.Config, email, password string)
 	if err != nil {
 		return err
 	}
-	if err := db.CreateAdmin(ctx, email, string(hash)); errors.Is(err, postgres.ErrConflict) {
+	if err := db.CreateAdmin(ctx, email, string(hash)); errors.Is(err, store.ErrConflict) {
 		return fmt.Errorf("já existe um administrador com o e-mail %s", email)
 	} else if err != nil {
 		return err
@@ -139,8 +148,20 @@ func VerifyLogs(ctx context.Context, cfg config.Config, out io.Writer) error {
 	return nil
 }
 
-func openDB(ctx context.Context, cfg config.Config) (*postgres.DB, error) {
-	db, err := postgres.Open(ctx, cfg.DatabaseURL)
+// openDB escolhe o driver pelo esquema de JANUS_DATABASE_URL e aplica as migrações.
+func openDB(ctx context.Context, cfg config.Config) (store.Store, error) {
+	var db store.Store
+	var err error
+	scheme, rest, _ := strings.Cut(cfg.DatabaseURL, "://")
+	switch scheme {
+	case "sqlite":
+		db, err = sqlite.Open(ctx, rest)
+	case "postgres", "postgresql":
+		db, err = postgres.Open(ctx, cfg.DatabaseURL)
+	default:
+		// Só o esquema na mensagem: a URL pode conter senha.
+		return nil, fmt.Errorf("JANUS_DATABASE_URL deve começar com sqlite:// ou postgres:// (recebido %q)", scheme+"://")
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -149,4 +170,37 @@ func openDB(ctx context.Context, cfg config.Config) (*postgres.DB, error) {
 		return nil, fmt.Errorf("migrar banco: %w", err)
 	}
 	return db, nil
+}
+
+// ensureMasterKey devolve a chave mestra. Numa instalação nova (banco sem
+// nenhuma chave de dados), se JANUS_MASTER_KEY_FILE aponta para um arquivo
+// que não existe, gera a chave e grava o arquivo. Com dados já cifrados, a
+// falta da chave é erro: gerar outra deixaria tudo ilegível.
+func ensureMasterKey(ctx context.Context, cfg config.Config, db store.Store, log *slog.Logger) ([]byte, error) {
+	if cfg.MasterKey != nil {
+		return cfg.MasterKey, nil
+	}
+	if cfg.MasterKeyFile == "" {
+		return nil, errors.New("defina JANUS_MASTER_KEY_FILE (recomendado) ou JANUS_MASTER_KEY")
+	}
+	has, err := db.HasDataKeys(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if has {
+		return nil, fmt.Errorf("a chave mestra %s não existe, mas o banco já tem dados cifrados: restaure o arquivo do backup", cfg.MasterKeyFile)
+	}
+
+	encoded := vault.GenerateMasterKey()
+	f, err := os.OpenFile(cfg.MasterKeyFile, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("gravar chave mestra: %w", err)
+	}
+	_, werr := f.WriteString(encoded + "\n")
+	if err := errors.Join(werr, f.Close()); err != nil {
+		os.Remove(cfg.MasterKeyFile)
+		return nil, fmt.Errorf("gravar chave mestra: %w", err)
+	}
+	log.Warn("chave mestra gerada; FAÇA BACKUP deste arquivo fora do servidor, sem ele os dados ficam ilegíveis", "arquivo", cfg.MasterKeyFile)
+	return config.DecodeMasterKey(encoded)
 }

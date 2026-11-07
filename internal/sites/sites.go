@@ -12,7 +12,7 @@ import (
 
 	"janus/internal/core"
 	"janus/internal/plugin/wifi"
-	"janus/internal/store/postgres"
+	"janus/internal/store"
 	"janus/internal/vault"
 )
 
@@ -21,7 +21,7 @@ var ErrNoController = errors.New("nenhum controlador Wi-Fi configurado para este
 var configAAD = []byte("janus/site/controller")
 
 type Service struct {
-	db    *postgres.DB
+	db    store.Store
 	vault *vault.Vault
 
 	mu          sync.Mutex
@@ -33,7 +33,7 @@ type cachedController struct {
 	ctrl    wifi.Controller
 }
 
-func New(db *postgres.DB, v *vault.Vault) *Service {
+func New(db store.Store, v *vault.Vault) *Service {
 	return &Service{db: db, vault: v, controllers: map[int64]cachedController{}}
 }
 

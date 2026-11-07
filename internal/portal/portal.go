@@ -22,7 +22,7 @@ import (
 	"janus/internal/hotspot"
 	"janus/internal/plugin/wifi"
 	"janus/internal/sites"
-	"janus/internal/store/postgres"
+	"janus/internal/store"
 	"janus/web"
 )
 
@@ -39,7 +39,7 @@ type ticket struct {
 }
 
 type Handler struct {
-	db      *postgres.DB
+	db      store.Store
 	sites   *sites.Service
 	hotspot *hotspot.Service
 	signer  Signer
@@ -47,7 +47,7 @@ type Handler struct {
 	log     *slog.Logger
 }
 
-func New(db *postgres.DB, s *sites.Service, h *hotspot.Service, signer Signer, tmpl *web.Set, log *slog.Logger) *Handler {
+func New(db store.Store, s *sites.Service, h *hotspot.Service, signer Signer, tmpl *web.Set, log *slog.Logger) *Handler {
 	return &Handler{db: db, sites: s, hotspot: h, signer: signer, tmpl: tmpl, log: log}
 }
 
@@ -129,7 +129,7 @@ func (h *Handler) connect(w http.ResponseWriter, r *http.Request) {
 	}
 	site, err := h.sites.Get(ctx, t.SiteID)
 	if err == nil && site.Slug != r.PathValue("site") {
-		err = postgres.ErrNotFound
+		err = store.ErrNotFound
 	}
 	if err != nil {
 		h.siteError(w, err)
@@ -217,7 +217,7 @@ func (h *Handler) renderError(w http.ResponseWriter, status int, t core.Theme, m
 }
 
 func (h *Handler) siteError(w http.ResponseWriter, err error) {
-	if errors.Is(err, postgres.ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) {
 		h.renderError(w, http.StatusNotFound, core.DefaultTheme(), "Rede não encontrada.")
 		return
 	}
@@ -256,7 +256,7 @@ func clientIP(r *http.Request) string {
 
 // AssetHandler serve imagens enviadas pelo painel. O id nunca muda de
 // conteúdo, então o cache pode ser longo.
-func AssetHandler(db *postgres.DB) http.Handler {
+func AssetHandler(db store.Store) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		if err != nil {

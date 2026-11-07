@@ -9,6 +9,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"strconv"
 	"strings"
 
@@ -16,18 +17,22 @@ import (
 	"janus/internal/ingest"
 	"janus/internal/portal"
 	"janus/internal/sites"
-	"janus/internal/store/postgres"
+	"janus/internal/store"
 	"janus/web"
 )
 
 type Deps struct {
-	DB            *postgres.DB
-	Sites         *sites.Service
-	Portal        *portal.Handler
-	Templates     *web.Set
-	Stats         func() ingest.Stats
-	Log           *slog.Logger
-	SecureCookies bool
+	DB        store.Store
+	Sites     *sites.Service
+	Portal    *portal.Handler
+	Templates *web.Set
+	Stats     func() ingest.Stats
+	// ReloadLogSources avisa o pipeline de logs que as fontes mudaram.
+	ReloadLogSources func()
+	Log              *slog.Logger
+	SecureCookies    bool
+	// AllowedNets restringe o painel a estas redes; vazio libera todas.
+	AllowedNets []netip.Prefix
 }
 
 type Handler struct{ Deps }
@@ -70,7 +75,7 @@ func (h *Handler) Routes() http.Handler {
 	auth("POST /settings", h.saveSettings)
 
 	// CrossOriginProtection bloqueia POSTs vindos de outras origens (CSRF).
-	return securityHeaders(http.NewCrossOriginProtection().Handler(mux))
+	return securityHeaders(allowNets(h.AllowedNets, http.NewCrossOriginProtection().Handler(mux)))
 }
 
 // page é o dado comum a todas as páginas do painel.
@@ -93,7 +98,7 @@ func (h *Handler) render(w http.ResponseWriter, r *http.Request, status int, nam
 
 func (h *Handler) fail(w http.ResponseWriter, r *http.Request, a core.Admin, err error) {
 	status, msg := http.StatusInternalServerError, "Erro interno. Veja os logs do servidor."
-	if errors.Is(err, postgres.ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) {
 		status, msg = http.StatusNotFound, "Página não encontrada."
 	} else {
 		h.Log.Error("erro no painel", "path", r.URL.Path, "err", err)
@@ -110,7 +115,7 @@ func (h *Handler) audit(r *http.Request, a core.Admin, action string, detail any
 func (h *Handler) siteFromPath(r *http.Request) (core.Site, error) {
 	id, err := pathID(r, "id")
 	if err != nil {
-		return core.Site{}, postgres.ErrNotFound
+		return core.Site{}, store.ErrNotFound
 	}
 	return h.Sites.Get(r.Context(), id)
 }
@@ -133,6 +138,26 @@ func formInt(r *http.Request, name string, def int) int {
 		return def
 	}
 	return n
+}
+
+// allowNets recusa conexões de fora das redes permitidas (JANUS_ADMIN_ALLOW).
+// É uma segunda barreira: o firewall deve bloquear o painel para visitantes.
+func allowNets(nets []netip.Prefix, next http.Handler) http.Handler {
+	if len(nets) == 0 {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if ap, err := netip.ParseAddrPort(r.RemoteAddr); err == nil {
+			ip := ap.Addr().Unmap()
+			for _, n := range nets {
+				if n.Contains(ip) {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+		}
+		http.Error(w, "O painel não está acessível a partir desta rede.", http.StatusForbidden)
+	})
 }
 
 func securityHeaders(next http.Handler) http.Handler {

@@ -11,7 +11,7 @@ import (
 	"janus/internal/ingest"
 	"janus/internal/plugin"
 	"janus/internal/plugin/wifi"
-	"janus/internal/store/postgres"
+	"janus/internal/store"
 )
 
 func (h *Handler) dashboard(w http.ResponseWriter, r *http.Request, a core.Admin) error {
@@ -164,7 +164,7 @@ func userError(err error, conflictMsg string) (string, bool) {
 		return "", false
 	case errors.As(err, &fe):
 		return fe.msg, true
-	case errors.Is(err, postgres.ErrConflict):
+	case errors.Is(err, store.ErrConflict):
 		return conflictMsg, true
 	}
 	return "", false

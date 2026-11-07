@@ -56,8 +56,12 @@ func (db *DB) GetKey(ctx context.Context, id uint32) (string, string, []byte, er
 	return scope, period, wrapped, nil
 }
 
-// DestroyKeysBefore apaga as chaves de um escopo anteriores ao período dado
-// (formato AAAA-MM) e devolve os ids destruídos.
+func (db *DB) HasDataKeys(ctx context.Context) (bool, error) {
+	var ok bool
+	err := db.pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM data_keys)`).Scan(&ok)
+	return ok, err
+}
+
 func (db *DB) DestroyKeysBefore(ctx context.Context, scope, period string) ([]uint32, error) {
 	rows, err := db.pool.Query(ctx, `
 		UPDATE data_keys SET wrapped = NULL, destroyed_at = now()

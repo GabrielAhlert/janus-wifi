@@ -1,6 +1,4 @@
-// Package postgres implementa a persistência do Janus em PostgreSQL. Ele só
-// lê e grava: a criptografia acontece antes, nos serviços (sites, hotspot,
-// ingest), e aqui chegam apenas bytes cifrados.
+// Package postgres é o driver de store.Store para um PostgreSQL externo.
 package postgres
 
 import (
@@ -11,19 +9,23 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"janus/internal/store"
 )
 
-var (
-	ErrNotFound = errors.New("registro não encontrado")
-	ErrConflict = errors.New("registro duplicado")
-)
+var _ store.Store = (*DB)(nil)
 
 type DB struct {
 	pool *pgxpool.Pool
+	desc string
 }
 
 func Open(ctx context.Context, url string) (*DB, error) {
-	pool, err := pgxpool.New(ctx, url)
+	cfg, err := pgxpool.ParseConfig(url)
+	if err != nil {
+		return nil, fmt.Errorf("URL do Postgres inválida: %w", err)
+	}
+	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -31,10 +33,13 @@ func Open(ctx context.Context, url string) (*DB, error) {
 		pool.Close()
 		return nil, fmt.Errorf("conectar ao banco: %w", err)
 	}
-	return &DB{pool: pool}, nil
+	c := cfg.ConnConfig
+	return &DB{pool: pool, desc: fmt.Sprintf("PostgreSQL em %s:%d/%s", c.Host, c.Port, c.Database)}, nil
 }
 
 func (db *DB) Close() { db.pool.Close() }
+
+func (db *DB) Describe() string { return db.desc }
 
 // querier é satisfeito tanto pelo pool quanto por uma transação.
 type querier interface {
@@ -44,11 +49,11 @@ type querier interface {
 
 func mapErr(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {
-		return ErrNotFound
+		return store.ErrNotFound
 	}
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-		return ErrConflict
+		return store.ErrConflict
 	}
 	return err
 }
@@ -58,7 +63,7 @@ func expectRow(tag pgconn.CommandTag, err error) error {
 		return mapErr(err)
 	}
 	if tag.RowsAffected() == 0 {
-		return ErrNotFound
+		return store.ErrNotFound
 	}
 	return nil
 }

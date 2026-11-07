@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"janus/internal/core"
+	"janus/internal/store"
 )
 
 func (db *DB) CreateAdmin(ctx context.Context, email, passwordHash string) error {
@@ -65,14 +66,11 @@ func (db *DB) Asset(ctx context.Context, id int64) (mime string, data []byte, er
 	return mime, data, mapErr(err)
 }
 
-// DefaultRetentionMonths segue o prazo mínimo do Marco Civil (art. 13).
-const DefaultRetentionMonths = 12
-
 func (db *DB) RetentionMonths(ctx context.Context) (int, error) {
 	var n int
 	err := db.pool.QueryRow(ctx, `SELECT (value)::int FROM settings WHERE key = 'retention_months'`).Scan(&n)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return DefaultRetentionMonths, nil
+		return store.DefaultRetentionMonths, nil
 	}
 	return n, err
 }

@@ -14,7 +14,10 @@ internal/
   core/                    domínio puro: Site, Field, Theme, Terms, LogEvent...
   config/                  variáveis de ambiente
   vault/                   criptografia: DEKs por mês, KEK, índice cego
-  store/postgres/          persistência + migrations/ (só bytes já cifrados)
+  store/                   interface Store (só recebe bytes já cifrados)
+    sqlite/                driver padrão: arquivo local, container único
+    postgres/              driver para Postgres externo
+    storetest/             suíte de contrato que os dois drivers passam
   plugin/
     config.go              descrição dos campos de config que o painel renderiza
     wifi/                  interface Controller + registro de drivers
@@ -60,26 +63,75 @@ Regra de dependência: `core` não importa nada interno. Plugins dependem só de
 
 ## Rodando
 
-Pré-requisitos: Podman (ou Docker) com compose.
+A imagem é publicada em `ghcr.io/gabrielahlert/janus-wifi` a cada push na `main` (tag `main`) e a cada versão (`vX.Y.Z` e `latest`).
+
+### Banco de dados
+
+O banco é escolhido por `JANUS_DATABASE_URL`:
+
+| Valor | Quando usar |
+|---|---|
+| `sqlite:///data/janus.db` (padrão) | Instalação de um container só, como no Unraid. O backup é um arquivo. |
+| `postgres://usuario:senha@host:5432/janus` | Quando você já tem um Postgres, ou com volume de syslog muito alto: o SQLite aceita um escritor por vez. |
+
+Não há migração automática entre os dois: escolha na instalação.
+
+### Chave mestra
+
+Se `JANUS_MASTER_KEY_FILE` (na imagem, `/secrets/master_key`) não existir e o banco estiver vazio, o Janus **gera a chave na primeira inicialização** e avisa no log. **Faça backup desse arquivo fora do servidor:** sem ele, os dados ficam ilegíveis. Se o banco já tiver dados e a chave sumir, o Janus se recusa a subir, em vez de gerar outra.
+
+### Unraid
+
+O UniFi exige o portal na porta 80, que a interface do Unraid já usa. Por isso o Janus roda com **IP próprio na `br0`**.
+
+1. Copie [deploy/unraid/janus-wifi.xml](deploy/unraid/janus-wifi.xml) para `/boot/config/plugins/dockerMan/templates-user/my-janus-wifi.xml`.
+2. Crie as pastas com o dono padrão do Unraid:
+   ```bash
+   mkdir -p /mnt/user/appdata/janus /mnt/user/appdata/janus-secrets && chown 99:100 /mnt/user/appdata/janus /mnt/user/appdata/janus-secrets && chmod 700 /mnt/user/appdata/janus-secrets
+   ```
+3. Em *Docker → Add Container*, escolha o template **janus-wifi**. Defina um IP fixo livre da LAN de gestão (ex.: `192.168.1.50`) e, em *Redes com acesso ao painel*, a rede da TI. Para usar um Postgres externo, troque *Banco de dados* pela URL dele.
+4. Suba o container e confira no log a linha `chave mestra gerada`. **Copie `/mnt/user/appdata/janus-secrets/master_key` para fora do servidor.** A pasta é separada justamente para você poder excluí-la do backup de appdata.
+5. Crie o administrador:
+   ```bash
+   docker exec -it janus-wifi /janus admin-create -email voce@empresa.com
+   ```
+6. Abra o painel em `http://<IP do container>:8081`.
+7. No UCG, permita que a rede de visitantes acesse `<IP do container>` **só na porta 80**, e aponte o syslog para `<IP do container>:514`. Os visitantes chegam roteados (sem NAT), então o IP de cada um fica registrado corretamente.
+
+Para atualizar, use *Force update* na aba Docker. Em produção, fixe uma versão (`:v1.2.3`) no lugar de `:main`.
+
+### Compose (outros servidores)
+
+O [compose.yaml](compose.yaml) é um exemplo com Postgres:
 
 ```bash
-podman build -t janus .
-podman run --rm janus keygen > master_key && chmod 600 master_key
+podman run --rm ghcr.io/gabrielahlert/janus-wifi:main keygen > master_key && chmod 600 master_key
 cp .env.example .env   # defina POSTGRES_PASSWORD
 podman compose up -d
 podman compose exec janus /janus admin-create -email voce@empresa.com
 ```
 
-- Portal: porta 80. O UniFi exige o portal externo na porta 80.
+- Portal: porta 80, porque o UniFi exige o portal externo nela.
 - Painel: `http://127.0.0.1:8081`. Exponha só na rede de gestão ou atrás de um proxy HTTPS. Sem HTTPS, defina `JANUS_INSECURE_COOKIES=1`.
 - Syslog: porta 5514, UDP e TCP.
 
-Variáveis: `JANUS_DATABASE_URL`, `JANUS_MASTER_KEY_FILE` (ou `JANUS_MASTER_KEY`), `JANUS_PORTAL_ADDR`, `JANUS_ADMIN_ADDR`, `JANUS_SYSLOG_ADDR`, `JANUS_INSECURE_COOKIES`.
+### Variáveis
+
+| Variável | Padrão | |
+|---|---|---|
+| `JANUS_DATABASE_URL` | `sqlite:///data/janus.db` | `sqlite://` ou `postgres://` |
+| `JANUS_MASTER_KEY_FILE` | `/secrets/master_key` (imagem) | gerado no primeiro boot se não existir |
+| `JANUS_MASTER_KEY` | | a chave em base64, alternativa ao arquivo |
+| `JANUS_PORTAL_ADDR` | `:8080` | |
+| `JANUS_ADMIN_ADDR` | `127.0.0.1:8081` | |
+| `JANUS_SYSLOG_ADDR` | `:5514` | UDP e TCP |
+| `JANUS_ADMIN_ALLOW` | (todas) | redes que podem abrir o painel, ex.: `192.168.1.0/24,10.0.0.5` |
+| `JANUS_INSECURE_COOKIES` | | `1` permite login no painel sem HTTPS |
 
 Para conferir a integridade dos logs (útil antes de atender um ofício):
 
 ```bash
-podman compose exec janus /janus verify-logs
+docker exec janus-wifi /janus verify-logs
 ```
 
 ## Configurando o UniFi
@@ -92,7 +144,7 @@ podman compose exec janus /janus verify-logs
    openssl s_client -connect 192.168.1.1:443 </dev/null 2>/dev/null | openssl x509 -noout -fingerprint -sha256
    ```
 
-4. **Logs do UCG**: em *Fontes de log*, cadastre o IP do gateway com o parser *UniFi Gateway*. No UniFi Network, aponte o syslog/SIEM para o Janus na porta 5514 e ligue o log nas regras de firewall da rede de visitantes.
+4. **Logs do UCG**: em *Fontes de log*, cadastre o IP do gateway com o parser *UniFi Gateway*. No UniFi Network, aponte o syslog/SIEM para o Janus (porta 514 no Unraid, 5514 no compose) e ligue o log nas regras de firewall da rede de visitantes.
 
 > **Limitação conhecida:** o log de firewall do UCG mostra o IP interno, mas não o IP/porta públicos pós-NAT. Para responder "quem usava o IP público X, porta Y, às HH:MM", é preciso o log de NAT. O Sophos fornece isso (`tran_src_ip`/`tran_src_port`), e esse é o motivo de ele ser o próximo parser.
 
@@ -125,6 +177,12 @@ go vet ./...
 ```
 
 Os testes cobrem a criptografia (incluindo crypto-shredding e chave mestra errada), o driver UniFi contra um controlador falso (login, CSRF, sessão expirada, fixação de certificado), o parser do UCG, a cadeia de hashes (alteração e remoção), a assinatura dos tickets, a validação de CPF/e-mail/telefone e a validação do tema.
+
+Os dois drivers de banco passam pela mesma suíte de contrato (`internal/store/storetest`). O SQLite roda sempre. O Postgres roda quando há um banco disponível, como no CI:
+
+```bash
+JANUS_TEST_POSTGRES_URL=postgres://janus:senha@localhost:5432/janus go test ./internal/store/...
+```
 
 ## Próximos passos
 
