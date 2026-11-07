@@ -141,3 +141,41 @@ func TestParseBase(t *testing.T) {
 		}
 	}
 }
+
+func TestPreparePinsSelfSignedCertificate(t *testing.T) {
+	srv := httptest.NewTLSServer(http.NotFoundHandler())
+	defer srv.Close()
+	sum := sha256.Sum256(srv.Certificate().Raw)
+
+	cfg, err := prepare(context.Background(), map[string]string{"url": srv.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := strings.ToLower(strings.ReplaceAll(cfg["tls_fingerprint"], ":", ""))
+	if got != hex.EncodeToString(sum[:]) {
+		t.Fatalf("fingerprint = %q, quer %x", cfg["tls_fingerprint"], sum)
+	}
+	// O fingerprint lido precisa ser aceito pelo próprio plugin.
+	if _, err := tlsConfig(cfg["tls_fingerprint"]); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPrepareKeepsConfigWhenNothingToPin(t *testing.T) {
+	srv := httptest.NewTLSServer(http.NotFoundHandler())
+	defer srv.Close()
+	cases := map[string]map[string]string{
+		"fingerprint já informado": {"url": srv.URL, "tls_fingerprint": "ab"},
+		"http":                     {"url": "http://127.0.0.1:1"},
+		"controlador fora do ar":   {"url": "https://127.0.0.1:1"},
+	}
+	for name, in := range cases {
+		out, err := prepare(context.Background(), in)
+		if err != nil {
+			t.Errorf("%s: erro %v", name, err)
+		}
+		if out["tls_fingerprint"] != in["tls_fingerprint"] {
+			t.Errorf("%s: fingerprint mudou para %q", name, out["tls_fingerprint"])
+		}
+	}
+}

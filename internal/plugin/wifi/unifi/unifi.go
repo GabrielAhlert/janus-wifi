@@ -16,6 +16,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -30,10 +32,11 @@ import (
 
 func init() {
 	wifi.Register(wifi.Driver{
-		Name:   "unifi",
-		Label:  "Ubiquiti UniFi",
-		Config: configFields,
-		New:    New,
+		Name:    "unifi",
+		Label:   "Ubiquiti UniFi",
+		Config:  configFields,
+		New:     New,
+		Prepare: prepare,
 	})
 }
 
@@ -47,7 +50,7 @@ var configFields = []plugin.ConfigField{
 	{Key: "password", Label: "Senha", Type: plugin.Password, Required: true, Secret: true},
 	{Key: "unifi_os", Label: "UniFi OS (UCG, UDM, Cloud Key Gen2+)", Type: plugin.Bool, Default: "true"},
 	{Key: "tls_fingerprint", Label: "Fingerprint SHA-256 do certificado", Type: plugin.Text,
-		Help: "Opcional. Fixa o certificado autoassinado do controlador; em branco, usa a validação TLS padrão"},
+		Help: "Em branco, o Janus lê o certificado ao salvar e, se for autoassinado (o padrão do UniFi), preenche este campo"},
 }
 
 type Controller struct {
@@ -235,6 +238,54 @@ func checkResponse(resp *http.Response) error {
 		}
 	}
 	return fmt.Errorf("HTTP %d: %s", resp.StatusCode, msg)
+}
+
+// prepare fixa o certificado do controlador quando ele não é confiável pelo
+// sistema (autoassinado) e o fingerprint está em branco. Se o controlador não
+// responder, salva assim mesmo: o erro aparece ao liberar o primeiro visitante.
+func prepare(ctx context.Context, cfg map[string]string) (map[string]string, error) {
+	if strings.TrimSpace(cfg["tls_fingerprint"]) != "" {
+		return cfg, nil
+	}
+	base, err := parseBase(cfg["url"])
+	if err != nil || base.Scheme != "https" {
+		return cfg, err
+	}
+	fp, err := untrustedFingerprint(ctx, base)
+	if err != nil || fp == "" {
+		return cfg, nil
+	}
+	out := maps.Clone(cfg)
+	out["tls_fingerprint"] = fp
+	return out, nil
+}
+
+// untrustedFingerprint conecta no controlador e devolve o SHA-256 do
+// certificado se a validação padrão o recusar, ou "" se ele for confiável.
+func untrustedFingerprint(ctx context.Context, base *url.URL) (string, error) {
+	addr := base.Host
+	if base.Port() == "" {
+		addr = net.JoinHostPort(base.Hostname(), "443")
+	}
+	d := tls.Dialer{
+		NetDialer: &net.Dialer{Timeout: 5 * time.Second},
+		Config:    &tls.Config{MinVersion: tls.VersionTLS12, ServerName: base.Hostname()},
+	}
+	conn, err := d.DialContext(ctx, "tcp", addr)
+	if err == nil {
+		conn.Close()
+		return "", nil
+	}
+	var verr *tls.CertificateVerificationError
+	if !errors.As(err, &verr) || len(verr.UnverifiedCertificates) == 0 {
+		return "", err
+	}
+	sum := sha256.Sum256(verr.UnverifiedCertificates[0].Raw)
+	parts := make([]string, len(sum))
+	for i, b := range sum {
+		parts[i] = fmt.Sprintf("%02X", b)
+	}
+	return strings.Join(parts, ":"), nil
 }
 
 func tlsConfig(fingerprint string) (*tls.Config, error) {

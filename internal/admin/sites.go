@@ -195,6 +195,11 @@ func siteFromForm(r *http.Request, s core.Site) (core.Site, error) {
 		if err != nil {
 			return s, invalid(err)
 		}
+		if d.Prepare != nil {
+			if cfg, err = d.Prepare(r.Context(), cfg); err != nil {
+				return s, invalid(err)
+			}
+		}
 		// O plugin confere a configuração (endereço, fingerprint) já ao salvar,
 		// e não só quando o primeiro visitante tentar entrar.
 		if _, err := d.New(cfg); err != nil {

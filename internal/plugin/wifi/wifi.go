@@ -37,6 +37,10 @@ type Driver struct {
 	Label  string // nome exibido no painel
 	Config []plugin.ConfigField
 	New    func(cfg map[string]string) (Controller, error)
+	// Prepare, opcional, completa a configuração quando o administrador salva
+	// (ex.: fixar o certificado autoassinado do controlador). Devolve a
+	// configuração a gravar.
+	Prepare func(ctx context.Context, cfg map[string]string) (map[string]string, error)
 }
 
 var (
