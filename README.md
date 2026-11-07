@@ -84,12 +84,15 @@ Se `JANUS_MASTER_KEY_FILE` (na imagem, `/secrets/master_key`) não existir e o b
 
 O UniFi exige o portal na porta 80, que a interface do Unraid já usa. Por isso o Janus roda com **IP próprio na `br0`**.
 
-1. Copie [deploy/unraid/janus-wifi.xml](deploy/unraid/janus-wifi.xml) para `/boot/config/plugins/dockerMan/templates-user/my-janus-wifi.xml`.
+1. No terminal do Unraid (ícone `>_` no topo), baixe o template [deploy/unraid/janus-wifi.xml](deploy/unraid/janus-wifi.xml) para a pasta de templates do usuário. Não depende da Community Applications:
+   ```bash
+   wget -O /boot/config/plugins/dockerMan/templates-user/my-janus-wifi.xml https://raw.githubusercontent.com/GabrielAhlert/janus-wifi/main/deploy/unraid/janus-wifi.xml
+   ```
 2. Crie as pastas com o dono padrão do Unraid:
    ```bash
    mkdir -p /mnt/user/appdata/janus /mnt/user/appdata/janus-secrets && chown 99:100 /mnt/user/appdata/janus /mnt/user/appdata/janus-secrets && chmod 700 /mnt/user/appdata/janus-secrets
    ```
-3. Em *Docker → Add Container*, escolha o template **janus-wifi**. Defina um IP fixo livre da LAN de gestão (ex.: `192.168.1.50`) e, em *Redes com acesso ao painel*, a rede da TI. Para usar um Postgres externo, troque *Banco de dados* pela URL dele.
+3. Em *Docker → Add Container*, escolha o template **janus-wifi** (em *User templates*). Defina um IP fixo livre da LAN de gestão (ex.: `192.168.1.50`) e, em *Redes com acesso ao painel*, a rede da TI. Para usar um Postgres externo, troque *Banco de dados* pela URL dele.
 4. Suba o container e confira no log a linha `chave mestra gerada`. **Copie `/mnt/user/appdata/janus-secrets/master_key` para fora do servidor.** A pasta é separada justamente para você poder excluí-la do backup de appdata.
 5. Crie o administrador:
    ```bash

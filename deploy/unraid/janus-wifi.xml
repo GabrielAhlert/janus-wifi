@@ -1,8 +1,9 @@
 <?xml version="1.0"?>
 <!--
   Template do Janus Wi-Fi para o Unraid (aba Docker).
-  Instalação: copie para /boot/config/plugins/dockerMan/templates-user/my-janus-wifi.xml
-  e use Docker > Add Container > Template: janus-wifi.
+  Instalação, no terminal do Unraid:
+    wget -O /boot/config/plugins/dockerMan/templates-user/my-janus-wifi.xml https://raw.githubusercontent.com/GabrielAhlert/janus-wifi/main/deploy/unraid/janus-wifi.xml
+  Depois: Docker > Add Container > Template: janus-wifi.
 -->
 <Container version="2">
   <Name>janus-wifi</Name>
