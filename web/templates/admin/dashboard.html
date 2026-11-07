@@ -6,6 +6,7 @@
 
 <div class="stats">
   <div class="stat"><span class="stat-value">{{.Data.Events24h}}</span><span class="stat-label">eventos de log nas últimas 24 h</span></div>
+  <div class="stat"><span class="stat-value">{{.Data.Stats.Ignored}}</span><span class="stat-label">mensagens ignoradas (sem acesso de visitante)</span></div>
   <div class="stat"><span class="stat-value">{{.Data.Stats.Unknown}}</span><span class="stat-label">mensagens de IPs não cadastrados</span></div>
   <div class="stat {{if or .Data.Stats.Dropped .Data.Stats.Failed}}alert{{end}}"><span class="stat-value">{{.Data.Stats.Dropped}} / {{.Data.Stats.Failed}}</span><span class="stat-label">descartados / com falha de gravação</span></div>
 </div>

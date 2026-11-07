@@ -1,10 +1,12 @@
 package ingest
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"log/slog"
 	"net/netip"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -90,5 +92,26 @@ func TestReloadAppliesNewSourceImmediately(t *testing.T) {
 	}
 	if refreshEvery < 5*time.Second {
 		t.Fatal("o teste só prova algo se o ciclo periódico for mais lento que o prazo")
+	}
+}
+
+func TestUnknownSenderWarnedOncePerIP(t *testing.T) {
+	var out bytes.Buffer
+	p := New(&fakeStore{}, nil, slog.New(slog.NewTextHandler(&out, nil)))
+	a, b := netip.MustParseAddr("192.168.1.1"), netip.MustParseAddr("192.168.1.2")
+	for range 3 {
+		p.Handle(a, "x")
+	}
+	p.Handle(b, "x")
+
+	if got := p.Stats().Unknown; got != 4 {
+		t.Fatalf("Unknown = %d, quer 4", got)
+	}
+	log := out.String()
+	if n := strings.Count(log, "ip=192.168.1.1"); n != 1 {
+		t.Fatalf("aviso de 192.168.1.1 apareceu %d vezes, quer 1:\n%s", n, log)
+	}
+	if !strings.Contains(log, "ip=192.168.1.2") {
+		t.Fatalf("faltou o aviso de 192.168.1.2:\n%s", log)
 	}
 }

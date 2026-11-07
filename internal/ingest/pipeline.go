@@ -28,6 +28,9 @@ const (
 	batchSize    = 500
 	flushEvery   = time.Second
 	refreshEvery = 30 * time.Second
+	// maxUnknownLogged limita quantos IPs desconhecidos são avisados no log,
+	// para um remetente forjando origens via UDP não encher a memória.
+	maxUnknownLogged = 64
 )
 
 var logAAD = []byte("janus/log_event")
@@ -63,17 +66,21 @@ type Pipeline struct {
 	mu     sync.RWMutex
 	routes map[netip.Addr]route
 
+	unknownMu   sync.Mutex
+	unknownSeen map[netip.Addr]bool
+
 	stored, ignored, unknown, dropped, failed atomic.Uint64
 }
 
 func New(store Store, v *vault.Vault, log *slog.Logger) *Pipeline {
 	return &Pipeline{
-		store:  store,
-		vault:  v,
-		log:    log,
-		queue:  make(chan item, queueSize),
-		reload: make(chan struct{}, 1),
-		routes: map[netip.Addr]route{},
+		store:       store,
+		vault:       v,
+		log:         log,
+		queue:       make(chan item, queueSize),
+		reload:      make(chan struct{}, 1),
+		routes:      map[netip.Addr]route{},
+		unknownSeen: map[netip.Addr]bool{},
 	}
 }
 
@@ -105,6 +112,7 @@ func (p *Pipeline) Handle(from netip.Addr, msg string) {
 	p.mu.RUnlock()
 	if !ok {
 		p.unknown.Add(1)
+		p.warnUnknown(from)
 		return
 	}
 	ev, ok := r.parser.Parse(msg)
@@ -117,6 +125,18 @@ func (p *Pipeline) Handle(from netip.Addr, msg string) {
 	default:
 		p.dropped.Add(1)
 	}
+}
+
+// warnUnknown avisa uma vez por IP que chegou syslog de um remetente não
+// cadastrado, para o administrador saber qual IP cadastrar em Fontes de log.
+func (p *Pipeline) warnUnknown(from netip.Addr) {
+	p.unknownMu.Lock()
+	defer p.unknownMu.Unlock()
+	if p.unknownSeen[from] || len(p.unknownSeen) >= maxUnknownLogged {
+		return
+	}
+	p.unknownSeen[from] = true
+	p.log.Warn("syslog de um IP não cadastrado em Fontes de log; mensagens descartadas", "ip", from)
 }
 
 // Run é o único escritor da tabela de eventos, o que mantém a cadeia de
