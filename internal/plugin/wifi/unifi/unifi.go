@@ -39,7 +39,7 @@ func init() {
 
 var configFields = []plugin.ConfigField{
 	{Key: "url", Label: "Endereço do controlador", Type: plugin.Text, Required: true,
-		Help: "Ex.: https://192.168.1.1 (UCG/UDM) ou https://controller:8443 (legado)"},
+		Help: "Ex.: 192.168.1.1 (UCG/UDM) ou https://controller:8443 (legado); sem esquema, usa https"},
 	{Key: "site", Label: "Site no UniFi", Type: plugin.Text, Default: "default",
 		Help: "Nome curto do site, como aparece na URL do controlador"},
 	{Key: "username", Label: "Usuário", Type: plugin.Text, Required: true,
@@ -63,9 +63,9 @@ type Controller struct {
 }
 
 func New(cfg map[string]string) (wifi.Controller, error) {
-	base, err := url.Parse(strings.TrimRight(cfg["url"], "/"))
-	if err != nil || (base.Scheme != "https" && base.Scheme != "http") || base.Host == "" {
-		return nil, fmt.Errorf("unifi: endereço inválido %q", cfg["url"])
+	base, err := parseBase(cfg["url"])
+	if err != nil {
+		return nil, err
 	}
 	tlsCfg, err := tlsConfig(cfg["tls_fingerprint"])
 	if err != nil {
@@ -88,6 +88,21 @@ func New(cfg map[string]string) (wifi.Controller, error) {
 			Transport: &http.Transport{TLSClientConfig: tlsCfg, Proxy: http.ProxyFromEnvironment},
 		},
 	}, nil
+}
+
+// parseBase aceita a URL completa ou só o host ("192.168.1.1",
+// "controller:8443"); sem esquema, assume https, que é o que o UniFi usa.
+func parseBase(raw string) (*url.URL, error) {
+	raw = strings.TrimSpace(raw)
+	if !strings.Contains(raw, "://") {
+		raw = "https://" + raw
+	}
+	raw = strings.TrimRight(raw, "/")
+	base, err := url.Parse(raw)
+	if err != nil || (base.Scheme != "https" && base.Scheme != "http") || base.Hostname() == "" {
+		return nil, fmt.Errorf("endereço do controlador inválido: %q (ex.: https://192.168.1.1)", raw)
+	}
+	return base, nil
 }
 
 func (c *Controller) ParseRedirect(q url.Values) (wifi.Client, error) {

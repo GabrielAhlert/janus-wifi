@@ -120,3 +120,24 @@ func TestParseRedirect(t *testing.T) {
 		t.Fatal("redirecionamento sem id deveria falhar")
 	}
 }
+
+func TestParseBase(t *testing.T) {
+	ok := map[string]string{
+		"10.1.10.1":                 "https://10.1.10.1",
+		" https://10.1.10.1/ ":      "https://10.1.10.1",
+		"controller:8443":           "https://controller:8443",
+		"http://controller:8080":    "http://controller:8080",
+		"https://unifi.empresa.lan": "https://unifi.empresa.lan",
+	}
+	for in, want := range ok {
+		got, err := parseBase(in)
+		if err != nil || got.String() != want {
+			t.Errorf("parseBase(%q) = %v, %v; quer %s", in, got, err, want)
+		}
+	}
+	for _, in := range []string{"", "ftp://10.1.10.1", "https://"} {
+		if _, err := parseBase(in); err == nil {
+			t.Errorf("parseBase(%q) deveria falhar", in)
+		}
+	}
+}
